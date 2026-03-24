@@ -5,6 +5,9 @@ interface AccessibilitySettings {
   reduceMotion: boolean;
   largeText: boolean;
   accessibleCalibration: boolean;
+  eyeGazeMode: boolean;
+  blinkMode: boolean;
+  autoAdvanceMode: boolean;
 }
 
 const DEFAULT: AccessibilitySettings = {
@@ -12,6 +15,9 @@ const DEFAULT: AccessibilitySettings = {
   reduceMotion: false,
   largeText: false,
   accessibleCalibration: false,
+  eyeGazeMode: false,
+  blinkMode: false,
+  autoAdvanceMode: false,
 };
 
 interface AccessibilityContextValue extends AccessibilitySettings {

@@ -7,6 +7,7 @@ import {
   BarChart2,
   BookOpen,
   Brain,
+  Camera,
   ChevronLeft,
   ChevronRight,
   Keyboard,
@@ -16,7 +17,9 @@ import {
   Target,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useAccessibility } from "../context/AccessibilityContext";
 import AccessibilityPanel from "./AccessibilityPanel";
+import GazeCursor from "./GazeCursor";
 import KeyboardShortcutsHelp from "./KeyboardShortcutsHelp";
 
 const NAV_ITEMS = [
@@ -32,8 +35,11 @@ export default function Layout() {
   const currentPath = router.state.location.pathname;
   const [collapsed, setCollapsed] = useState(false);
   const [a11yOpen, setA11yOpen] = useState(false);
+  const { eyeGazeMode, blinkMode, autoAdvanceMode } = useAccessibility();
 
   const navigate = (path: string) => router.navigate({ to: path });
+
+  const cameraActive = eyeGazeMode || blinkMode;
 
   // Keyboard shortcuts: 1-5 for page navigation
   useEffect(() => {
@@ -65,6 +71,9 @@ export default function Layout() {
 
       {/* Keyboard Shortcuts Help (listens for ? globally) */}
       <KeyboardShortcutsHelp />
+
+      {/* Gaze Cursor overlay */}
+      {eyeGazeMode && <GazeCursor />}
 
       {/* Sidebar */}
       <aside
@@ -172,7 +181,6 @@ export default function Layout() {
             )}
             aria-label="Show keyboard shortcuts (press ?)"
             onClick={() => {
-              // Dispatch a ? keydown to trigger the shortcut dialog
               document.dispatchEvent(
                 new KeyboardEvent("keydown", { key: "?" }),
               );
@@ -232,10 +240,50 @@ export default function Layout() {
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* App label strip */}
-        <div className="text-center py-2 bg-primary/5 border-b border-border shrink-0">
+        <div className="text-center py-2 bg-primary/5 border-b border-border shrink-0 flex items-center justify-center gap-3">
           <span className="text-xs font-semibold tracking-widest uppercase text-primary/70">
             Cognitive State Detection System
           </span>
+          {/* Camera active indicator */}
+          {cameraActive && (
+            <div
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-500/10 border border-green-500/30"
+              title={
+                eyeGazeMode && blinkMode
+                  ? "Eye Gaze & Blink Mode active"
+                  : eyeGazeMode
+                    ? "Eye Gaze Mode active"
+                    : "Blink Mode active"
+              }
+              aria-label={
+                eyeGazeMode && blinkMode
+                  ? "Eye Gaze and Blink Mode active"
+                  : eyeGazeMode
+                    ? "Eye Gaze Mode active"
+                    : "Blink Mode active"
+              }
+            >
+              <Camera className="w-3 h-3 text-green-600" aria-hidden="true" />
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+              {!collapsed && (
+                <span className="text-xs text-green-600 font-medium">
+                  {eyeGazeMode && blinkMode
+                    ? "Gaze + Blink"
+                    : eyeGazeMode
+                      ? "Gaze"
+                      : "Blink"}
+                </span>
+              )}
+            </div>
+          )}
+          {autoAdvanceMode && (
+            <div
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30"
+              aria-label="Auto-Advance Mode active"
+            >
+              <span className="text-xs text-blue-600 font-medium">⏱ Auto</span>
+            </div>
+          )}
         </div>
 
         <main

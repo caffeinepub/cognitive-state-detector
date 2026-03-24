@@ -36,6 +36,24 @@ const OPTIONS = [
     description:
       "Replaces mouse-movement tests with keyboard reaction tests during calibration.",
   },
+  {
+    key: "eyeGazeMode" as const,
+    label: "Eye Gaze Navigation",
+    description:
+      "Look at any button for 2 seconds to activate it. Uses your webcam.",
+  },
+  {
+    key: "blinkMode" as const,
+    label: "Blink Detection",
+    description:
+      "A large on-screen BLINK button appears. Hold it to confirm or click. Uses webcam for visual feedback.",
+  },
+  {
+    key: "autoAdvanceMode" as const,
+    label: "Auto-Advance Mode",
+    description:
+      "All steps advance automatically on timers. No input needed at all.",
+  },
 ];
 
 export default function AccessibilityPanel({ open, onClose }: Props) {
@@ -45,7 +63,7 @@ export default function AccessibilityPanel({ open, onClose }: Props) {
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
       <SheetContent
         side="right"
-        className="w-80"
+        className="w-80 overflow-y-auto"
         data-ocid="accessibility.panel"
       >
         <SheetHeader className="mb-6">
@@ -78,6 +96,19 @@ export default function AccessibilityPanel({ open, onClose }: Props) {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Deaf-Mute-Paralytic section */}
+        <div className="mt-8 p-4 rounded-lg bg-primary/5 border border-primary/20">
+          <p className="text-xs font-semibold text-primary mb-1">
+            For deaf, mute & unable to move hands
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Enable <strong>Auto-Advance Mode</strong> — no typing, clicking, or
+            sound needed. The app will complete all steps automatically using
+            timers. Combine with <strong>Eye Gaze Navigation</strong> if your
+            browser supports webcam face detection (Chrome 88+).
+          </p>
         </div>
       </SheetContent>
     </Sheet>

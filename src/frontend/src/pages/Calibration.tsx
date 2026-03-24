@@ -9,9 +9,12 @@ import {
   CheckCircle,
   ChevronRight,
   Clock,
+  Eye,
   Keyboard,
   Loader2,
   MousePointer,
+  Timer,
+  Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -24,14 +27,16 @@ import {
 const CALIBRATION_TEXT =
   "The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs. How valiantly do we fight for what is right.";
 
-type Step = 0 | 1 | 2 | 3; // 0=intro, 1=typing, 2=mouse, 3=rest
+type Step = 0 | 1 | 2 | 3; // 0=intro, 1=typing, 2=mouse/reaction, 3=rest
 
-const REACTION_DURATION = 15000; // 15s
+const REACTION_DURATION = 15000;
 const CIRCLE_CHANGE_MIN = 2000;
 const CIRCLE_CHANGE_MAX = 3000;
+const AUTO_TYPING_DURATION = 20000;
 
 export default function Calibration() {
-  const { accessibleCalibration } = useAccessibility();
+  const { accessibleCalibration, eyeGazeMode, blinkMode, autoAdvanceMode } =
+    useAccessibility();
 
   const [step, setStep] = useState<Step>(0);
   const [typingWpm, setTypingWpm] = useState(0);
@@ -40,9 +45,14 @@ export default function Calibration() {
   const [startTime, setStartTime] = useState<number | null>(null);
   const [mouseCountdown, setMouseCountdown] = useState(15);
   const [restCountdown, setRestCountdown] = useState(10);
+  const [autoTypingCountdown, setAutoTypingCountdown] = useState(20);
   const mouseSpeedsRef = useRef<number[]>([]);
   const [done, setDone] = useState(false);
   const prevMouseRef = useRef({ x: 0, y: 0, t: Date.now() });
+
+  // Blink mode on-screen blink button state
+  const [blinkHeld, setBlinkHeld] = useState(false);
+  const blinkHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Keyboard reaction test state
   const [circleColor, setCircleColor] = useState<"blue" | "gray">("gray");
@@ -74,6 +84,27 @@ export default function Calibration() {
     },
     [saveProfile],
   );
+
+  // Auto-advance step 1 (typing) — 20s timer
+  useEffect(() => {
+    if (step !== 1 || !autoAdvanceMode) return;
+    setAutoTypingCountdown(20);
+    const interval = setInterval(() => {
+      setAutoTypingCountdown((c) => Math.max(0, c - 1));
+    }, 1000);
+    const timer = setTimeout(() => {
+      clearInterval(interval);
+      setTypingWpm(40);
+      setStep(2);
+      setMouseCountdown(15);
+      mouseSpeedsRef.current = [];
+      toast("Auto-advance: using default 40 WPM");
+    }, AUTO_TYPING_DURATION);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
+  }, [step, autoAdvanceMode]);
 
   // Step 2 (standard): Mouse tracking
   useEffect(() => {
@@ -135,7 +166,6 @@ export default function Calibration() {
       nextTimeout = setTimeout(() => {
         setCircleColor("blue");
         circleChangedAtRef.current = Date.now();
-        // Turn gray again after 800ms if not reacted
         setTimeout(() => setCircleColor("gray"), 800);
         scheduleCircleChange();
       }, delay);
@@ -150,7 +180,6 @@ export default function Calibration() {
         times.length > 0
           ? times.reduce((a, b) => a + b, 0) / times.length
           : 400;
-      // Map avg reaction time to a "mouse baseline" equivalent score
       const baseline = Math.max(50, Math.round(500 - avgReaction * 0.5));
       setMouseBaseline(baseline);
       setStep(3);
@@ -236,6 +265,28 @@ export default function Calibration() {
     finishCalibrationWithBaseline(mouseBaseline, typingWpm);
   };
 
+  // Blink hold handlers
+  const handleBlinkHoldStart = () => {
+    if (blinkHeld) return;
+    setBlinkHeld(true);
+    blinkHoldTimerRef.current = setTimeout(() => {
+      setBlinkHeld(false);
+      toast.success("Blink confirmed!");
+      // Treat as a reaction
+      if (circleChangedAtRef.current !== null) {
+        const rt = Date.now() - circleChangedAtRef.current;
+        if (rt < 2000) reactionTimesRef.current.push(rt);
+        circleChangedAtRef.current = null;
+        setCircleColor("gray");
+      }
+    }, 300);
+  };
+
+  const handleBlinkHoldEnd = () => {
+    if (blinkHoldTimerRef.current) clearTimeout(blinkHoldTimerRef.current);
+    setBlinkHeld(false);
+  };
+
   const steps = [
     { label: "Typing Baseline", icon: Keyboard },
     {
@@ -301,22 +352,71 @@ export default function Calibration() {
         </p>
       </div>
 
-      {/* Accessible Calibration Mode banner */}
-      {accessibleCalibration && (
-        <div
-          className="flex items-center gap-3 px-4 py-3 rounded-lg bg-primary/5 border border-primary/20"
-          data-ocid="calibration.a11y_mode.panel"
-        >
-          <Accessibility
-            className="w-4 h-4 text-primary shrink-0"
-            aria-hidden="true"
-          />
-          <p className="text-sm">
-            <strong>Accessible Calibration Mode is enabled.</strong> Mouse steps
-            are replaced with keyboard alternatives.
-          </p>
-        </div>
-      )}
+      {/* Active mode banners */}
+      <div className="space-y-2">
+        {autoAdvanceMode && (
+          <div
+            className="flex items-center gap-3 px-4 py-3 rounded-lg bg-blue-500/10 border border-blue-500/30"
+            data-ocid="calibration.auto_advance.panel"
+            aria-live="polite"
+          >
+            <Timer
+              className="w-4 h-4 text-blue-600 shrink-0"
+              aria-hidden="true"
+            />
+            <p className="text-sm">
+              <strong>Auto-Advance Mode is active.</strong> No input required —
+              all steps will complete automatically on timers. Just watch the
+              screen.
+            </p>
+          </div>
+        )}
+        {eyeGazeMode && (
+          <div
+            className="flex items-center gap-3 px-4 py-3 rounded-lg bg-indigo-500/10 border border-indigo-500/30"
+            aria-live="polite"
+          >
+            <Eye
+              className="w-4 h-4 text-indigo-600 shrink-0"
+              aria-hidden="true"
+            />
+            <p className="text-sm">
+              <strong>Eye Gaze Mode active</strong> — look at any button for 2
+              seconds to activate it.
+            </p>
+          </div>
+        )}
+        {blinkMode && (
+          <div
+            className="flex items-center gap-3 px-4 py-3 rounded-lg bg-purple-500/10 border border-purple-500/30"
+            aria-live="polite"
+          >
+            <Zap
+              className="w-4 h-4 text-purple-600 shrink-0"
+              aria-hidden="true"
+            />
+            <p className="text-sm">
+              <strong>Blink Mode active</strong> — hold the large BLINK button
+              for ~300ms to confirm actions.
+            </p>
+          </div>
+        )}
+        {accessibleCalibration && !autoAdvanceMode && (
+          <div
+            className="flex items-center gap-3 px-4 py-3 rounded-lg bg-primary/5 border border-primary/20"
+            data-ocid="calibration.a11y_mode.panel"
+          >
+            <Accessibility
+              className="w-4 h-4 text-primary shrink-0"
+              aria-hidden="true"
+            />
+            <p className="text-sm">
+              <strong>Accessible Calibration Mode is enabled.</strong> Mouse
+              steps are replaced with keyboard alternatives.
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* Existing profile banner */}
       {existingProfile && step === 0 && (
@@ -384,6 +484,14 @@ export default function Calibration() {
               personal behavioral baselines. All processing happens in your
               browser.
             </p>
+            {autoAdvanceMode && (
+              <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-sm">
+                <strong>Auto-Advance is ON:</strong> You don't need to press
+                anything. Press Start below (or wait — the button is also
+                auto-clicked after 5 seconds), then watch each step complete on
+                its own timer.
+              </div>
+            )}
             <ul className="space-y-3">
               {steps.map((s, i) => (
                 <li key={s.label} className="flex items-center gap-3 text-sm">
@@ -395,17 +503,23 @@ export default function Calibration() {
                   </div>
                   <span>
                     <strong>Step {i + 1}:</strong>{" "}
-                    {accessibleCalibration
+                    {autoAdvanceMode
                       ? [
-                          "Type a passage to measure your baseline typing speed",
-                          "Press Space/Enter when the circle turns blue to measure your reaction baseline",
-                          "Rest for 10 seconds to capture your resting state",
+                          "Typing baseline — auto-completes in 20 seconds, no input required",
+                          "Reaction/rest baseline — auto-completes on a timer",
+                          "Rest for 10 seconds — auto-completes and saves",
                         ][i]
-                      : [
-                          "Type a passage to measure your baseline typing speed",
-                          "Move your mouse naturally to establish movement patterns",
-                          "Rest for 10 seconds to capture your resting state",
-                        ][i]}
+                      : accessibleCalibration
+                        ? [
+                            "Type a passage to measure your baseline typing speed",
+                            "Press Space/Enter when the circle turns blue to measure your reaction baseline",
+                            "Rest for 10 seconds to capture your resting state",
+                          ][i]
+                        : [
+                            "Type a passage to measure your baseline typing speed",
+                            "Move your mouse naturally to establish movement patterns",
+                            "Rest for 10 seconds to capture your resting state",
+                          ][i]}
                   </span>
                 </li>
               ))}
@@ -434,45 +548,100 @@ export default function Calibration() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Auto-advance countdown */}
+            {autoAdvanceMode && (
+              <div
+                className="flex items-center gap-4 p-4 rounded-xl bg-blue-500/10 border border-blue-500/30"
+                aria-live="polite"
+                aria-atomic="true"
+              >
+                <div className="w-16 h-16 rounded-full border-4 border-blue-500/40 flex items-center justify-center shrink-0">
+                  <span className="text-2xl font-bold text-blue-600">
+                    {autoTypingCountdown}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-blue-700">
+                    Step will auto-complete in {autoTypingCountdown} seconds
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    No typing required. Using default 40 WPM baseline.
+                  </p>
+                </div>
+              </div>
+            )}
             <div
               className="bg-muted/50 rounded-lg p-4 text-sm font-mono leading-relaxed text-muted-foreground"
               aria-label="Passage to type"
             >
               {CALIBRATION_TEXT}
             </div>
-            <Textarea
-              placeholder="Type the passage above..."
-              value={typedText}
-              onChange={(e) => handleTypingChange(e.target.value)}
-              className="h-28 font-mono text-sm"
-              aria-label="Typing test area"
-              data-ocid="calibration.typing.textarea"
-            />
+            {!autoAdvanceMode && (
+              <Textarea
+                placeholder="Type the passage above..."
+                value={typedText}
+                onChange={(e) => handleTypingChange(e.target.value)}
+                className="h-28 font-mono text-sm"
+                aria-label="Typing test area"
+                data-ocid="calibration.typing.textarea"
+              />
+            )}
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="text-sm text-muted-foreground">
                 {typingWpm > 0 && (
                   <Badge variant="outline">~{typingWpm} WPM</Badge>
                 )}
               </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={skipTypingTest}
-                  variant="outline"
-                  className="text-xs"
-                  data-ocid="calibration.skip_typing.button"
-                >
-                  Skip (use default 40 WPM)
-                </Button>
-                <Button
-                  onClick={finishStep1}
-                  className="bg-primary"
-                  data-ocid="calibration.typing.next.button"
-                >
-                  Next{" "}
-                  <ChevronRight className="w-4 h-4 ml-1" aria-hidden="true" />
-                </Button>
-              </div>
+              {!autoAdvanceMode && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={skipTypingTest}
+                    variant="outline"
+                    className="text-xs"
+                    data-ocid="calibration.skip_typing.button"
+                  >
+                    Skip (use default 40 WPM)
+                  </Button>
+                  <Button
+                    onClick={finishStep1}
+                    className="bg-primary"
+                    data-ocid="calibration.typing.next.button"
+                  >
+                    Next{" "}
+                    <ChevronRight className="w-4 h-4 ml-1" aria-hidden="true" />
+                  </Button>
+                </div>
+              )}
             </div>
+
+            {/* Blink mode button */}
+            {blinkMode && !autoAdvanceMode && (
+              <div className="mt-4 flex flex-col items-center gap-2">
+                <p className="text-xs text-muted-foreground">
+                  Or use blink to skip:
+                </p>
+                <button
+                  type="button"
+                  onMouseDown={handleBlinkHoldStart}
+                  onMouseUp={handleBlinkHoldEnd}
+                  onTouchStart={handleBlinkHoldStart}
+                  onTouchEnd={handleBlinkHoldEnd}
+                  className={cn(
+                    "w-32 h-32 rounded-full border-4 text-lg font-bold transition-all select-none",
+                    blinkHeld
+                      ? "bg-purple-500 border-purple-600 text-white scale-95"
+                      : "bg-purple-100 border-purple-400 text-purple-700",
+                  )}
+                  data-ocid="calibration.blink.button"
+                  aria-label="Hold for 300ms to skip typing test"
+                >
+                  {blinkHeld ? "BLINKING..." : "BLINK"}
+                </button>
+                <p className="text-xs text-muted-foreground">
+                  Hold for ~300ms to confirm
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -492,10 +661,31 @@ export default function Calibration() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Move your mouse naturally within the box below. We&apos;re
-              measuring your typical movement speed and patterns.
-            </p>
+            {autoAdvanceMode ? (
+              <div
+                className="flex items-center gap-4 p-4 rounded-xl bg-blue-500/10 border border-blue-500/30"
+                aria-live="polite"
+              >
+                <div className="w-16 h-16 rounded-full border-4 border-blue-500/40 flex items-center justify-center shrink-0">
+                  <span className="text-2xl font-bold text-blue-600">
+                    {mouseCountdown}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-blue-700">
+                    Auto-completing in {mouseCountdown} seconds
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    No input required. Using default movement baseline.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Move your mouse naturally within the box below. We&apos;re
+                measuring your typical movement speed and patterns.
+              </p>
+            )}
             <div
               className="h-40 rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 flex flex-col items-center justify-center cursor-none select-none"
               data-ocid="calibration.mouse.canvas_target"
@@ -506,7 +696,9 @@ export default function Calibration() {
                 className="w-8 h-8 text-primary/40 mb-2"
                 aria-hidden="true"
               />
-              <p className="text-sm text-primary/60">Move your mouse here</p>
+              <p className="text-sm text-primary/60">
+                {autoAdvanceMode ? "Auto-measuring..." : "Move your mouse here"}
+              </p>
             </div>
             <div className="flex items-center gap-4">
               <Progress
@@ -537,19 +729,41 @@ export default function Calibration() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center gap-3 px-4 py-3 bg-muted/50 rounded-lg text-sm text-muted-foreground">
-              Press{" "}
-              <kbd className="px-2 py-0.5 bg-background border rounded text-xs font-mono">
-                Space
-              </kbd>{" "}
-              or{" "}
-              <kbd className="px-2 py-0.5 bg-background border rounded text-xs font-mono">
-                Enter
-              </kbd>{" "}
-              each time the circle turns{" "}
-              <strong className="text-primary">blue</strong>. This measures your
-              reaction baseline.
-            </div>
+            {!autoAdvanceMode && (
+              <div className="flex items-center gap-3 px-4 py-3 bg-muted/50 rounded-lg text-sm text-muted-foreground">
+                Press{" "}
+                <kbd className="px-2 py-0.5 bg-background border rounded text-xs font-mono">
+                  Space
+                </kbd>{" "}
+                or{" "}
+                <kbd className="px-2 py-0.5 bg-background border rounded text-xs font-mono">
+                  Enter
+                </kbd>{" "}
+                each time the circle turns{" "}
+                <strong className="text-primary">blue</strong>. This measures
+                your reaction baseline.
+              </div>
+            )}
+            {autoAdvanceMode && (
+              <div
+                className="flex items-center gap-4 p-4 rounded-xl bg-blue-500/10 border border-blue-500/30"
+                aria-live="polite"
+              >
+                <div className="w-16 h-16 rounded-full border-4 border-blue-500/40 flex items-center justify-center shrink-0">
+                  <span className="text-2xl font-bold text-blue-600">
+                    {reactionCountdown}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-blue-700">
+                    Auto-completing in {reactionCountdown} seconds
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    No response needed. Baseline will be estimated.
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Reaction circle */}
             <div
@@ -583,7 +797,9 @@ export default function Calibration() {
               <p className="text-sm text-muted-foreground">
                 {circleColor === "blue"
                   ? "🔵 Press Space / Enter / Click now!"
-                  : "Watching for the blue circle..."}
+                  : autoAdvanceMode
+                    ? "Watching automatically..."
+                    : "Watching for the blue circle..."}
               </p>
               <p className="text-xs text-muted-foreground">
                 Reactions recorded: {reactionTimesRef.current.length}
@@ -600,6 +816,33 @@ export default function Calibration() {
                 {reactionCountdown}s
               </span>
             </div>
+
+            {/* Blink mode button for reaction step */}
+            {blinkMode && !autoAdvanceMode && (
+              <div className="flex flex-col items-center gap-2 pt-2">
+                <p className="text-xs text-muted-foreground">Blink to react:</p>
+                <button
+                  type="button"
+                  onMouseDown={handleBlinkHoldStart}
+                  onMouseUp={handleBlinkHoldEnd}
+                  onTouchStart={handleBlinkHoldStart}
+                  onTouchEnd={handleBlinkHoldEnd}
+                  className={cn(
+                    "w-32 h-32 rounded-full border-4 text-lg font-bold transition-all select-none",
+                    blinkHeld
+                      ? "bg-purple-500 border-purple-600 text-white scale-95"
+                      : "bg-purple-100 border-purple-400 text-purple-700",
+                  )}
+                  data-ocid="calibration.blink_react.button"
+                  aria-label="Hold for 300ms to register reaction"
+                >
+                  {blinkHeld ? "BLINKING..." : "BLINK"}
+                </button>
+                <p className="text-xs text-muted-foreground">
+                  Hold ~300ms to react
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -619,11 +862,15 @@ export default function Calibration() {
             <p className="text-sm text-muted-foreground">
               Relax and stay still. We&apos;re capturing your baseline resting
               state.{" "}
-              {accessibleCalibration && (
+              {autoAdvanceMode ? (
+                <span className="text-blue-600 font-medium">
+                  Auto-completing — no input needed.
+                </span>
+              ) : accessibleCalibration ? (
                 <span className="text-primary font-medium">
                   You may press Space to skip ahead.
                 </span>
-              )}
+              ) : null}
             </p>
             <div
               className="h-32 flex flex-col items-center justify-center gap-3"
@@ -644,7 +891,17 @@ export default function Calibration() {
               className="h-2"
               aria-label={`Rest progress: ${10 - restCountdown} of 10 seconds`}
             />
-            {accessibleCalibration && (
+            {(accessibleCalibration || autoAdvanceMode) && !autoAdvanceMode && (
+              <Button
+                variant="outline"
+                onClick={skipRestStep}
+                className="w-full"
+                data-ocid="calibration.skip_rest.button"
+              >
+                Skip rest step
+              </Button>
+            )}
+            {accessibleCalibration && !autoAdvanceMode && (
               <Button
                 variant="outline"
                 onClick={skipRestStep}
