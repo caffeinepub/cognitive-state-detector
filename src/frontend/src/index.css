@@ -1,0 +1,176 @@
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.625rem;
+
+    /* Background: #F4F7FA light cool gray */
+    --background: 0.969 0.008 240;
+    /* Foreground: #1F2937 near-black */
+    --foreground: 0.27 0.02 255;
+
+    /* Card: white */
+    --card: 1 0 0;
+    --card-foreground: 0.27 0.02 255;
+
+    --popover: 1 0 0;
+    --popover-foreground: 0.27 0.02 255;
+
+    /* Primary: #2F80ED blue */
+    --primary: 0.6 0.18 252;
+    --primary-foreground: 1 0 0;
+
+    /* Secondary: muted bg */
+    --secondary: 0.95 0.008 240;
+    --secondary-foreground: 0.27 0.02 255;
+
+    --muted: 0.95 0.008 240;
+    --muted-foreground: 0.55 0.02 255;
+
+    /* Accent: light blue tint #E8F1FE */
+    --accent: 0.95 0.04 252;
+    --accent-foreground: 0.6 0.18 252;
+
+    --destructive: 0.577 0.245 27.325;
+    --destructive-foreground: 1 0 0;
+
+    /* Border: #E6EDF3 */
+    --border: 0.92 0.01 240;
+    --input: 0.92 0.01 240;
+    --ring: 0.6 0.18 252;
+
+    /* Charts */
+    --chart-1: 0.6 0.18 252; /* blue - focus */
+    --chart-2: 0.65 0.17 155; /* green - ok / fatigue */
+    --chart-3: 0.85 0.17 88; /* amber - warning / stress */
+    --chart-4: 0.76 0.16 60; /* orange */
+    --chart-5: 0.55 0.02 255; /* muted */
+
+    /* Sidebar: white */
+    --sidebar: 1 0 0;
+    --sidebar-foreground: 0.27 0.02 255;
+    --sidebar-primary: 0.6 0.18 252;
+    --sidebar-primary-foreground: 1 0 0;
+    --sidebar-accent: 0.95 0.04 252;
+    --sidebar-accent-foreground: 0.6 0.18 252;
+    --sidebar-border: 0.92 0.01 240;
+    --sidebar-ring: 0.6 0.18 252;
+
+    /* Custom semantic */
+    --success: 0.65 0.17 155;
+    --warning: 0.85 0.17 88;
+    --orange: 0.76 0.16 60;
+
+    /* Ring color for focus */
+    --ring-color: #2f80ed;
+  }
+
+  /* ============================================
+     HIGH CONTRAST MODE
+     ============================================ */
+  html.high-contrast {
+    --background: 1 0 0;
+    --foreground: 0 0 0;
+    --card: 1 0 0;
+    --card-foreground: 0 0 0;
+    --popover: 1 0 0;
+    --popover-foreground: 0 0 0;
+    --primary: 0.35 0.25 252;
+    --primary-foreground: 1 0 0;
+    --secondary: 0.95 0 0;
+    --secondary-foreground: 0 0 0;
+    --muted: 0.93 0 0;
+    --muted-foreground: 0.2 0 0;
+    --accent: 0.9 0.1 252;
+    --accent-foreground: 0.2 0.25 252;
+    --border: 0.5 0 0;
+    --input: 0.5 0 0;
+    --ring: 0.35 0.25 252;
+    --ring-color: #0050cc;
+    --sidebar: 1 0 0;
+    --sidebar-foreground: 0 0 0;
+    --sidebar-border: 0.5 0 0;
+    --sidebar-primary: 0.35 0.25 252;
+    --sidebar-accent: 0.88 0.12 252;
+    --sidebar-accent-foreground: 0.2 0.25 252;
+  }
+
+  /* ============================================
+     LARGE TEXT MODE
+     ============================================ */
+  html.large-text body {
+    font-size: 18px;
+  }
+
+  /* ============================================
+     REDUCED MOTION
+     ============================================ */
+  html.reduce-motion *,
+  html.reduce-motion *::before,
+  html.reduce-motion *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  /* ============================================
+     FOCUS VISIBLE - Enhanced for accessibility
+     ============================================ */
+  *:focus-visible {
+    outline: 3px solid var(--ring-color, #2f80ed);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  /* ============================================
+     SCREEN READER UTILITIES
+     ============================================ */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  .sr-only.focus\:not-sr-only:focus,
+  .focus\:not-sr-only:focus {
+    position: absolute;
+    width: auto;
+    height: auto;
+    padding: 0.5rem 1rem;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  }
+}
